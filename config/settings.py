@@ -16,9 +16,6 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-import sys, os 
-
-sys.path.append(os.path.dirname(__file__)) # add root
 
 # -------------------------------
 # Vector DB (Qdrant embedded)
@@ -43,6 +40,12 @@ OPENROUTER_BASE_URL: str = os.environ.get("OPENROUTER_BASE_URL", "https://openro
 # API key file (preferred) or env var
 OPENROUTER_KEY_FILE: str = os.environ.get("OPENROUTER_KEY_FILE", "config/openrouter_key.txt")
 OPENROUTER_API_KEY_ENV: str = "OPENROUTER_API_KEY"
+
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = PROJECT_ROOT / "data" / "docs"
+OPENROUTER_KEY_FILE: str = os.environ.get("OPENROUTER_KEY_FILE", PROJECT_ROOT/"config/openrouter_key.txt")
 
 
 def load_openrouter_key() -> Optional[str]:
