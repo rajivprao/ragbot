@@ -19,6 +19,8 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import vector_store
+import markdown
 
 
 # Local imports
@@ -68,7 +70,7 @@ def main():
         enable_ocr=enable_ocr,
     )
 
-    if args.docs_dir:
+    if args.docs_dir and not rag.vstore.ensure_collection():
         print(f"[RUN] Ingesting documents from: {args.docs_dir}")
         rag.ingest_path(args.docs_dir, corpus_id="enterprise_docs")
 
@@ -81,7 +83,8 @@ def main():
         print(f"[RUN] Asking: {args.question}")
         ans = rag.ask(args.question, role=args.role)
         print("\n=== ANSWER ===\n")
-        print(ans)
+        #print(ans)
+        print(markdown.markdown(ans))
     else:
         print("[INFO] Skipping ask() because API key is not set.")
 

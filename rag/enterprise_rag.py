@@ -187,6 +187,8 @@ class EnterpriseRAG:
             app_name=app_name,
         )
 
+        self.gemini_llm = LLMClient(api_key=openrouter_api_key)
+
     # -------------------------------------------------------------------------
     # Configuration helpers
     # -------------------------------------------------------------------------
@@ -325,7 +327,8 @@ class EnterpriseRAG:
         # Call LLM
         if not self.llm.api_key:
             raise RuntimeError("OpenRouter API key is not set. Use set_api_key() or pass in constructor.")
-        answer = self.llm.chat(prompts["system"], prompts["user"], temperature=temperature)
+        #answer = self.llm.chat(prompts["system"], prompts["user"], temperature=temperature)
+        answer = self.gemini_llm.gemini_chat(prompts["system"], prompts["user"], temperature=temperature)
         return answer
 
     # -------------------------------------------------------------------------

@@ -345,3 +345,124 @@ class LLMClient:
         if rate_limited:
             base *= 1.5
         time.sleep(min(base, 10.0))
+
+
+#--------------------------------------------------------------------------
+
+    GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+
+
+    # ---------------------------
+    # Gemini API
+    # ---------------------------
+
+    def gemini_chat(
+        self,
+        system: str,
+        user: str,
+        *,
+        temperature: float = 0.2,
+        top_p: float | None = None,
+        max_tokens: int | None = None,
+        model: str = "gemini-1.5-pro",
+    ) -> str:
+        """
+        Simple Gemini chat: system + user → text
+        """
+        payload = self._gemini_payload(
+            system=system,
+            user=user,
+            temperature=temperature,
+            top_p=top_p,
+            max_tokens=max_tokens,
+        )
+
+        url = f"{self.GEMINI_BASE_URL}/gemini-2.5-flash:generateContent"
+        data = self._gemini_request_json(url, payload)
+        return self._extract_gemini_text(data)
+
+    def _gemini_payload(
+        self,
+        *,
+        system: str,
+        user: str,
+        temperature: float,
+        top_p: float | None,
+        max_tokens: int | None,
+    ) -> dict:
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": user}],
+                }
+            ],
+            "systemInstruction": {
+                "parts": [{"text": system}]
+            },
+            "generationConfig": {
+                "temperature": float(temperature),
+            },
+        }
+
+        gen_cfg = payload["generationConfig"]
+        if top_p is not None:
+            gen_cfg["topP"] = float(top_p)
+        if max_tokens is not None:
+            gen_cfg["maxOutputTokens"] = int(max_tokens)
+
+        return payload
+
+
+    def _gemini_request_json(self, url: str, payload: dict) -> dict:
+        """
+        Gemini POST with retry/backoff.
+        """
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                resp = self.session.post(
+                    url,
+                    params={"key": self.api_key},
+                    headers={"Content-Type": "application/json"},
+                    json=payload,
+                    timeout=self.timeout,
+                )
+
+                if resp.status_code == 429:
+                    raise LLMRateLimitError("Gemini rate limit")
+
+                if 500 <= resp.status_code < 600:
+                    raise requests.ConnectionError(resp.text)
+
+                if not (200 <= resp.status_code < 300):
+                    raise LLMAPIError(f"Gemini HTTP {resp.status_code}: {resp.text[:300]}")
+
+                return resp.json()
+
+            except (requests.Timeout, requests.ConnectionError) as e:
+                if attempt >= self.max_retries:
+                    raise LLMClientError(f"Gemini failed after {attempt} attempts: {e}") from e
+                self._sleep_backoff(attempt)
+
+            except LLMRateLimitError:
+                if attempt >= self.max_retries:
+                    raise
+                self._sleep_backoff(attempt, rate_limited=True)
+
+        raise LLMClientError("Gemini exhausted retries")
+
+
+    def _extract_gemini_text(self, data: dict) -> str:
+        """
+        Extract text from Gemini response.
+        """
+        try:
+            candidates = data.get("candidates") or []
+            if not candidates:
+                return ""
+
+            parts = candidates[0].get("content", {}).get("parts") or []
+            texts = [p.get("text", "") for p in parts]
+            return "".join(texts).strip()
+        except Exception:
+            return ""
